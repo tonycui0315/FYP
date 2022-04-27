@@ -1,175 +1,124 @@
-# from string import strip
-from operator import itemgetter
-import os
-from io import StringIO
-import zipfile
-import tempfile
-import shutil
-
-from bs4 import BeautifulSoup
-import requests
-from pprint import pprint
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+import sys
+import csv
 
 
-base_url = 'https://developer.chrome.com/extensions/'
-page_url = base_url + 'samples'
+
+def get_page_links(pageDriver, baseUrl):
+    a_tags = driver.find_elements_by_tag_name('a')
+    #  links = [link.get_attribute('href') for link in elements if (baseUrl in link.get_attribute('href'))]
+
+    # Get all urls
+    urls = [tag.get_attribute('href') for tag in a_tags]
+
+    #Get urls that start with baseUrl
+    useful_urls = [url for url in urls if url and baseUrl in url]
+
+    return useful_urls
+
+def get_page_text(pageDriver):
+    pageBody = pageDriver.find_element_by_xpath("/html/body")
+    if not pageBody:
+        return ""
+    return pageBody.text
 
 
-# Scrape data from Examples page
+visited_urls = set()
+unvisited_urls = set()
+error_urls = set()
+my_map = {}
 
-r = requests.get(page_url, verify=False)
+options = webdriver.ChromeOptions()
+options.add_argument("--headless")
+options.add_argument('--log-level=1')
+driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=options)
 
-soup = BeautifulSoup(r.text)
+fileName = input('Please enter file name to write: ')
+baseUrl = input("Please enter website's base url: ")
+unvisited_urls.add(baseUrl)
 
-examples = []
+ct = 0
+while unvisited_urls:
+    # Remove url from unvisited and add it to visited
+    currPage = unvisited_urls.pop()
+    print(currPage)
+    visited_urls.add(currPage)
 
-for index, sample_section in enumerate(soup('div', class_='sample')):
-    project = {}
-    project['name'] = sample_section.a.string
-    project['desc'] = (sample_section.a.parent.next_sibling).strip()
-    zip_url = sample_section.a.get('href')
-    project['zip'] = zip_url
-    project['folder'] = zip_url[zip_url.rfind('/') + 1: zip_url.rfind('.zip')]
-
-    doc = []
-    files = []
-
-    links = sample_section('ul')
-    for index, item in enumerate(links[0].select('li code a')):
-        doc.append({'call': item.string,
-                    'link': base_url + item.get('href')})
-
-    for index, item in enumerate(links[1].select('li code a')):
-        files.append({'call': item.string,
-                      'link': base_url + item.get('href')})
-    project['doc'] = doc
-    project['files'] = files
-
-    examples.append(project)
-
-
-# Setup subfolder for new git repo
-
-subfolder = 'chrome-extensions-examples'
-
-os.mkdir(subfolder)
-
-
-# Download and extract example projects
-
-bullet_list_template = '* [%(call)s](%(link)s)'
-readme_template = """
-%(name)s
-=======
-
-%(desc)s
-
-[Zipfile](http://developer.chrome.com/extensions/%(zip)s)
-
-Content is licensed under the [Google BSD License](https://developers.google.com/open-source/licenses/bsd).
-
-Calls
------
-
-"""
-
-for index, project in enumerate(examples):
-    print(project['name'])
-
-    project_path = os.path.join(subfolder, project['folder'])
-
-    tmp_dir = tempfile.mkdtemp()
-
-    r = requests.get(base_url + project['zip'], verify=False)
-    if r.ok:
-        z = zipfile.ZipFile(StringIO.StringIO(r.content))  # type: ignore
-        z.extractall(path=tmp_dir)
-    else:
-        if r.status_code == 500:
-            print('>> error downloading ' + base_url + project['zip'])
-            del examples[index]
-            continue
-
+    # Get page content
     try:
-        shutil.copytree(os.path.join(tmp_dir, project['folder']), project_path)
-    except OSError, e:
-        if e.errno == 17:
-            num = 1
-            while True:
-                try:
-                    tmp_path = project_path + '_' + str(num)
-                    print('>> Got existing subfolder: "' +
-                          project_path + '", trying "' + tmp_path + "")
-                    shutil.copytree(os.path.join(
-                        tmp_dir, project['folder']), tmp_path)
-                    project_path = tmp_path
-                    break
-                except OSError, e:
-                    if e.errno == 17:
-                        num += 1
-                        continue
-                    else:
-                        break
-                        raise e
-        else:
-            raise e
+        driver.get(currPage)
+    except:
+        error_urls.add(currPage)
+        print('Error getting page: ', currPage)
+        continue
 
-    shutil.rmtree(tmp_dir)
-
-    project['subfolder'] = os.path.split(project_path)[1]
-
-    bullets = []
-    for item in project['doc']:
-        bullets.append(bullet_list_template % item)
-
-    readme = readme_template % project
-    readme += '\n'.join(bullets)
-
-    with open(os.path.join(project_path, 'README.md'), 'a') as outfile:
-        outfile.write(readme)
-
-
-# Write main readme with correct project subfolders
-
-project_list_template = '* [%(name)s](/%(subfolder)s/)'
-project_list = []
-
-for project in sorted(examples, key=itemgetter('name')):
+    # Get links
     try:
-        project_list.append(project_list_template % project)
-    except KeyError, e:
-        print('>> got keyerror creating link for ' + project['name'])
+        currLinks = get_page_links(driver, baseUrl)
+    except:
+        error_urls.add(currPage)
+        print('Error getting links: ', currPage)
+        continue
 
-main_readme = """
+    # Get text
+    try:
+        currText = get_page_text(driver)
+        textToWrite = currText.splitlines()
+        print(textToWrite)
+        with open(f'{fileName}.csv', 'w') as csvfile:
+            fieldnames = ['id', 'text']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-**This is not an official mirror of the Chrome extension examples. Report any issues with the examples themselves to Google's issue trackers/forums.**
+            writer.writeheader()
+            for text in textToWrite:
+                writer.writerow({'id': ct, 'text': {text}})
+                ct += 1
+    except:
+        error_urls.add(currPage)
+        print('Error getting text: ', currPage)
+        continue
 
-**There is an ongoing effort to standardize the Extensions on different browsers, as [discussed on MDN](https://developer.mozilla.org/en-US/Add-ons/WebExtensions) and defined in the [WebExtensions Spec Draft](https://browserext.github.io/browserext/). The resources on [browser support](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Browser_support_for_JavaScript_APIs) and [incompatibilities](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Chrome_incompatibilities) may be of interest.**
+    # Add links to unvisited if they haven't been visited already
+    # for link in currLinks:
+    #     if link not in visited_urls:
+    #         unvisited_urls.add(link)
 
-chrome-extensions-examples
-==========================
+    # my_map[currPage] = currText
 
-The [Chrome Extensions examples](http://developer.chrome.com/extensions/samples) did not
-exist as a Git repository, and browsing both the samples page and the VCViewer did not seem particularly
-handy. So, I decided to scrape the content into this repository for easier browsing and (possible)
-editing.
-
-If you would like to clone a part of this repository, use git
-[sparse checkouts](http://jasonkarns.com/blog/subdirectory-checkouts-with-git-sparse-checkout/).
-
-You can find the scraper used to generate this repository (except for a `git init` and push)
-on [github](https://github.com/orbitbot/chrome-extension-scraper).
-
-
-Content is licensed under the [Google BSD License](https://developers.google.com/open-source/licenses/bsd).
+print("-----------------------------------------DATA RECOVER IS DONE")
+# textToWrite = ""
+# if len(error_urls) > 1:
+#     textToWrite += "List of urls that did not work: \n"
+#     for url in error_urls:
+#         textToWrite += f"This url failed: {url}\n"
+#     textToWrite += "\n\n"
 
 
-Example projects
-----------------
+# ct = 0
+# for key in my_map:
+#     # textToWrite += ('-'*30 + key + '-'*30 + '\n') 
+#     with open(f'{fileName}.txt', 'w') as csvfile:
+#         fieldnames = ['id', 'text']
+#         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-"""
+#         writer.writeheader()
+#         writer.writerow({'id': ct, 'text': {my_map[key]}})
+#     ct += 1
 
-main_readme += '\n'.join(project_list)
 
-with open(os.path.join(subfolder, 'README.md'), 'w') as outfile:
-    outfile.write(main_readme)
+# textToWrite = textToWrite.encode("ascii", errors="ignore").decode()
+# with open(f'{fileName}.txt', 'w') as f:
+#     f.write(textToWrite)
+
+
+# with open(f'{fileName}.txt', 'w', newline='') as csvfile:
+#     fieldnames = ['id', 'text']
+#     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+#     writer.writeheader()
+#     writer.writerow({'first_name': 'Baked', 'last_name': 'Beans'})
+#     writer.writerow({'first_name': 'Lovely', 'last_name': 'Spam'})
+#     writer.writerow({'first_name': 'Wonderful', 'last_name': 'Spam'})
+
+sys.exit('Program finished')
