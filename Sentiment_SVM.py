@@ -122,7 +122,7 @@ def fnc_clean_tweet(tweet_txt, pattern):
 # ------------------------------------------------------------------------------------------------------------------
 
 train_RAW = pd.read_csv('train.csv')
-test_RAW = pd.read_csv('test.csv')
+test_RAW = pd.read_csv('testCSV.csv')
 
 train = train_RAW
 test = test_RAW
@@ -144,16 +144,16 @@ allTweets.head()
 
 
 # Clean tweeter Text
-# Add new column tidy_tweet with the clean tweet text
+# Add new column tidy_text with the clean tweet text
 # ------------------------------------------------------------------------------------------------------------------
 
-allTweets['tidy_tweet'] = np.vectorize(fnc_clean_tweet)(
-    allTweets['tweet'], "@[\w]*")  # Remove twitter handles (@user)
+allTweets['tidy_text'] = np.vectorize(fnc_clean_tweet)(
+    allTweets['text'], "@[\w]*")  # Remove twitter handles (@user)
 
-allTweets['tidy_tweet'] = allTweets['tidy_tweet'].str.replace(
+allTweets['tidy_text'] = allTweets['tidy_text'].str.replace(
     "[^a-zA-Z#]", " ")  # Remove special xters, nums, punctuations
 
-# allTweets['tidy_tweet'] = allTweets['tidy_tweet'].apply(
+# allTweets['tidy_text'] = allTweets['tidy_text'].apply(
 #     lambda x: ' '.join([w for w in x.split() if len(w) > 3]))  # Remove short words
 
 allTweets.head()
@@ -165,7 +165,7 @@ allTweets.head()
 # Tokenization
 # ------------------------------------------------------------------------------------------------------------------
 
-tokenized_tweet = allTweets['tidy_tweet'].apply(lambda x: x.split())
+tokenized_tweet = allTweets['tidy_text'].apply(lambda x: x.split())
 tokenized_tweet.head()
 
 
@@ -183,7 +183,7 @@ tokenized_tweet = tokenized_tweet.apply(
 for i in range(len(tokenized_tweet)):
     tokenized_tweet[i] = ' '.join(tokenized_tweet[i])
 
-allTweets['tidy_tweet'] = tokenized_tweet
+allTweets['tidy_text'] = tokenized_tweet
 
 allTweets.head()
 
@@ -193,7 +193,7 @@ allTweets.head()
 # Show word cloud
 # ------------------------------------------------------------------------------------------------------------------
 
-# allWords = ' '.join([text for text in allTweets['tidy_tweet']])
+# allWords = ' '.join([text for text in allTweets['tidy_text']])
 
 # tweetsWordCloud = WordCloud(
 #     width=800, height=500, random_state=21, max_font_size=110).generate(allWords)
@@ -212,7 +212,7 @@ allTweets.head()
 # ------------------------------------------------------------------------------------------------------------------
 
 # normalWords = ' '.join(
-#     [text for text in allTweets['tidy_tweet'][allTweets['label'] == 0]])
+#     [text for text in allTweets['tidy_text'][allTweets['label'] == 0]])
 
 # normalWordCloud = WordCloud(
 #     width=800, height=500, random_state=21, max_font_size=110).generate(normalWords)
@@ -230,7 +230,7 @@ allTweets.head()
 # ------------------------------------------------------------------------------------------------------------------
 
 # racistWords = ' '.join(
-#     [text for text in allTweets['tidy_tweet'][allTweets['label'] == 1]])
+#     [text for text in allTweets['tidy_text'][allTweets['label'] == 1]])
 
 # racistWordCloud = WordCloud(
 #     width=800, height=500, random_state=21, max_font_size=110).generate(racistWords)
@@ -249,11 +249,11 @@ allTweets.head()
 
 # Extract Non-racist/sexist hashtags
 # normalTags = fnc_extract_hashtag(
-#     allTweets['tidy_tweet'][allTweets['label'] == 0])
+#     allTweets['tidy_text'][allTweets['label'] == 0])
 
 # # Extract racist/sexist hashtags
 # racistTags = fnc_extract_hashtag(
-#     allTweets['tidy_tweet'][allTweets['label'] == 1])
+#     allTweets['tidy_text'][allTweets['label'] == 1])
 
 # # unnesting lists
 # normalTags = sum(normalTags, [])
@@ -305,7 +305,7 @@ allTweets.head()
 # ------------------------------------------------------------------------------------------------------------------
 
 # bag-of-words feature matrix
-bow = bow_vectorizer.fit_transform(allTweets['tidy_tweet'])
+bow = bow_vectorizer.fit_transform(allTweets['tidy_text'])
 
 
 # In[17]:
@@ -318,7 +318,7 @@ bow = bow_vectorizer.fit_transform(allTweets['tidy_tweet'])
 # TF-IDF = TF*IDF
 
 # TF-IDF feature matrix
-tfidf = tfidf_vectorizer.fit_transform(allTweets['tidy_tweet'])
+tfidf = tfidf_vectorizer.fit_transform(allTweets['tidy_text'])
 
 
 # In[18]:
@@ -413,9 +413,9 @@ SVC()
 
 # Applying k-Fold Cross Validation
 
-# acc = cross_val_score(estimator=svm, X=xtrain_bow, y=ytrain, cv=10)
-# acc.mean()
-# acc.std()
+acc = cross_val_score(estimator=svm, X=xtrain_bow, y=ytrain, cv=10)
+acc.mean()
+acc.std()
 
 
 # In[ ]:
